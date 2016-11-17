@@ -52,15 +52,45 @@ architecture beh of minimips_top is
 	signal ID_control
 	signal ID_Sim
 	signal ID_ta
+	signal IDEX_RS
+	signal IDEX_RT
+	signal IDEX_wb_addr
+	signal IDEX_control
+	signal IDEX_Sim
+	signal IDEX_ta
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXECUTE>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-  
+	signal IDEX_RS
+	signal IDEX_RT
+	signal IDEX_wb_addr
+	signal IDEX_control
+	signal IDEX_Sim
+	signal IDEX_ta
+	signal EX_branch
+	signal EX_ta
+	signal EX_alu
+	signal EX_dmem_addr
+	signal EX_dmem_write
+	
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXME>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-  
+	signal EX_alu
+	signal EX_dmem_addr
+	signal EX_dmem_write
+	signal EXME_alu
+	signal EXME_dmem_addr
+	signal EXME_dmem_write
+	signal EXME_wb_addr
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEMORY>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEWB>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-  
+	signal EXME_alu
+	signal EXME_wb_addr
+	signal MEWB_alu
+	signal MEWB_wb_addr
+	
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WRITEBACK>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
+	signal MEWB_alu
+	signal MEWB_wb_addr
+	signal WB_data
 begin   
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<FETCH>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
 

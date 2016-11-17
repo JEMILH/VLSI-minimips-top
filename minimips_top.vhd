@@ -6,7 +6,7 @@
 -- Author     : Mickael Fiorentino  <mickael.fiorentino@polymtl.ca>
 -- Lab        : grm@polymtl
 -- Created    : 2016-09-23
--- Last update: 2016-09-28
+-- Last update: 2016-11-17
 -------------------------------------------------------------------------------
 -- Description: Instruction memory 
 -------------------------------------------------------------------------------
@@ -46,12 +46,6 @@ architecture beh of minimips_top is
 	signal ID_Sim
 	signal ID_ta
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<IDEX>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-	signal ID_RS
-	signal ID_RT
-	signal ID_wb_addr
-	signal ID_control
-	signal ID_Sim
-	signal ID_ta
 	signal IDEX_RS
 	signal IDEX_RT
 	signal IDEX_wb_addr
@@ -59,12 +53,6 @@ architecture beh of minimips_top is
 	signal IDEX_Sim
 	signal IDEX_ta
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXECUTE>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-	signal IDEX_RS
-	signal IDEX_RT
-	signal IDEX_wb_addr
-	signal IDEX_control
-	signal IDEX_Sim
-	signal IDEX_ta
 	signal EX_branch
 	signal EX_ta
 	signal EX_alu
@@ -72,9 +60,6 @@ architecture beh of minimips_top is
 	signal EX_dmem_write
 	
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXME>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-	signal EX_alu
-	signal EX_dmem_addr
-	signal EX_dmem_write
 	signal EXME_alu
 	signal EXME_dmem_addr
 	signal EXME_dmem_write
@@ -82,14 +67,10 @@ architecture beh of minimips_top is
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEMORY>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEWB>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-	signal EXME_alu
-	signal EXME_wb_addr
 	signal MEWB_alu
 	signal MEWB_wb_addr
 	
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WRITEBACK>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-	signal MEWB_alu
-	signal MEWB_wb_addr
 	signal WB_data
 begin   
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<FETCH>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--

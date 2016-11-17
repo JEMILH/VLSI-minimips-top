@@ -70,10 +70,10 @@ architecture beh of minimips_top is
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEMORY>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEWB>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-  signal MEWB_alu
-      signal MEWB_dmem
-    signal MEWB_wb_addr
-    signal MEWB_lw : std_logic;
+  signal MEWB_alu     : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal MEWB_dmem    : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal MEWB_wb_addr : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
+  signal MEWB_lw      : std_logic;
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WRITEBACK>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   signal WB_data
@@ -108,5 +108,5 @@ begin
   end process MEWB;
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WRITEBACK>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   WB_data <= MEWB_dmem when MEWB_lw = '1' else MEWB_alu;
-  
+
 end architecture beh;

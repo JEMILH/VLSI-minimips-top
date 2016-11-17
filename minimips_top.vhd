@@ -16,6 +16,11 @@ use ieee.numeric_std.all;
 use std.textio.all;
 
 entity minimips_top is
+	generic (
+    ADDR_WIDTH : positive := 32;
+    BTA_WIDTH  : positive := 16;        -- branch target address
+    JTA_WIDTH  : positive := 26);       -- jump target address
+
     port(
 	in_rst_n : in std_logic;
 	in_clk : in std_logic;
@@ -25,13 +30,33 @@ entity minimips_top is
 	out_dmem_we: out std_logic;
 	out_dmem_addr: out std_logic_vector(9 downto 0);
 	out_imem_addr: out std_logic_vector(9 downto 0));
-end entity minimips_top;
+	end entity minimips_top;
 
 architecture beh of minimips_top is
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<FETCH>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
 	signal IF_PC : std_logic_vector(31 downto 0);
---<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<IFID>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
+	component minimips_imem
+		port(
+			in_addr : in std_logic_vector(ADDR_WIDTH - 1 downto 0);    
+			out_read: out std_logic_vector(ADDR_WIDTH - 1 downto 0)
+		);
+	end component minimips_imem;
+	component minimips_pc
+		port(
+		in_clk      : in  std_logic;
+		in_rst_n    : in  std_logic;
+		in_f_stall  : in  std_logic;
+		in_f_jump   : in  std_logic;
+		in_f_jumpr  : in  std_logic;
+		in_f_branch : in  std_logic;
+		in_s_ta     : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
+		out_pc      : out std_logic_vector(ADDR_WIDTH - 1 downto 0));
+	);
+	end component
 
+--<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<IFID>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
+	signal IF_imem : std_logic_vector(31 downto 0);
+	signal IFID_imem
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<DECODE>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
 	signal ID_rs
 	signal ID_rt
@@ -74,7 +99,20 @@ architecture beh of minimips_top is
 	signal WB_data
 begin   
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<FETCH>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-
+	imem1 : minimips_imem port map(
+			in_addr => IF_PC,
+			out_read => IF_imem
+			);
+	pc1 : minimips_pc port map(
+			out_pc => IF_PC,
+			in_clk => in_clk,
+			in_rst_n =>,
+			in_f_stall =>,
+			in_f_jump =>,
+			in_f_branch =>,
+			in_s_ta =>,
+			out_pc
+	);
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<IFID>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<DECODE>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--

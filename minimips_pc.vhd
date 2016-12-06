@@ -59,7 +59,7 @@ begin  -- architecture behavioral
     end if;
   end process pc_register;
 
-  next_pc_logic : process (in_s_ta, in_f_stall, in_f_jump, in_f_jumpr, in_f_branch, current_pc) is
+  next_pc_logic : process (in_s_ta, in_f_stall, in_f_jump, in_f_jumpr, in_f_branch, current_pc, out_data) is
 
     variable pc_plus_4 : unsigned(ADDR_WIDTH - 1 downto 0);
 

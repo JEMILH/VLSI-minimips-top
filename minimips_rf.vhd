@@ -40,7 +40,11 @@ begin  -- architecture behavioral
       ram <= (others => (others => '0'));
     elsif in_clk'event and in_clk = '1' then  -- writing
       if in_we = '1' then
-        ram(to_integer(unsigned(in_addr_w))) <= in_data_w;
+        if(in_addr_w = std_logic_vector(to_unsigned(0,ADDR_WIDTH))) then
+          ram(to_integer(unsigned(in_addr_w))) <= (others => '0');
+        else
+          ram(to_integer(unsigned(in_addr_w))) <= in_data_w;
+        end if;
       end if;
     end if;
     

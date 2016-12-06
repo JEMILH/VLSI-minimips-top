@@ -228,7 +228,7 @@ begin
 
   --EXT
   ID_ta(JTA_WIDTH - 1 downto 0)                       <= ID_target;
-  ID_ta(ADDR_WIDTH - 1 downto ADDR_WIDTH - JTA_WIDTH) <= (others => '0');
+  ID_ta(ADDR_WIDTH - 1 downto JTA_WIDTH) <= (others => '0');
 
   -- SIGNED-EXT
   ID_Simm(15 downto 0) <= ID_imm;
@@ -395,7 +395,7 @@ begin
     end case;
   end process;
 
-  EX_alu_b <= IDEX_data_rt when IDEX_r_type = '1' else IDEX_Simm;
+  EX_alu_b <= IDEX_data_rt when (IDEX_r_type = '1' or IDEX_branch = '1') else IDEX_Simm;
 
   EX_dmem_addr  <= EX_alu;
   EX_dmem_write <= IDEX_data_rt;

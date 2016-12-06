@@ -2,18 +2,15 @@
 -- Project    : ELE8304 : Circuits intégrés à très grande échelle 
 -- Description: Conception d'un microprocesseur mini-mips
 -------------------------------------------------------------------------------
--- File       : minimips_imem.vhd
--- Author     : Mickael Fiorentino  <mickael.fiorentino@polymtl.ca>
+-- File       : minimips_top.vhd
+-- Author     : David Binet, Mathieu Léonardon
 -- Lab        : grm@polymtl
--- Created    : 2016-09-23
--- Last update: 2016-12-01
 -------------------------------------------------------------------------------
--- Description: Instruction memory 
+-- Description: minimips top
 -------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use std.textio.all;
 
 entity minimips_top is
   generic (
@@ -37,7 +34,7 @@ architecture beh of minimips_top is
   constant DATA_WIDTH    : positive := 32;
   constant BTA_WIDTH     : positive := 16;  -- branch target address width
   constant JTA_WIDTH     : positive := 26;  -- jump target address width
-
+  constant OP_WIDTH      : positive := 6;
 
   signal IF_PC   : std_logic_vector(ADDR_WIDTH - 1 downto 0);
   signal IF_imem : std_logic_vector(ADDR_WIDTH - 1 downto 0);
@@ -93,9 +90,9 @@ architecture beh of minimips_top is
       out_data_rb : out std_logic_vector(DATA_WIDTH - 1 downto 0));
   end component minimips_rf;
 
-  signal ID_addr_rs   : std_logic_vector(ADDR_WIDTH_MEM - 1 downto 0);
-  signal ID_addr_rt   : std_logic_vector(ADDR_WIDTH_MEM - 1 downto 0);
-  signal ID_addr_rd   : std_logic_vector(ADDR_WIDTH_MEM - 1 downto 0);
+  signal ID_addr_rs   : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
+  signal ID_addr_rt   : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
+  signal ID_addr_rd   : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
   signal ID_data_rs   : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal ID_data_rt   : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal ID_opcode    : std_logic_vector(5 downto 0);
@@ -106,13 +103,13 @@ architecture beh of minimips_top is
 --    signal ID_control
   signal ID_Simm      : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal ID_ta        : std_logic_vector(ADDR_WIDTH - 1 downto 0);
-  signal ID_lw        : std_logic;
-  signal ID_ta_sel    : std_logic;
+  signal ID_ta_sel    : std_logic_vector(1 downto 0);
   signal ID_lw        : std_logic;
   signal ID_sw        : std_logic;
   signal ID_branch    : std_logic;
   signal ID_jump      : std_logic;
   signal ID_jumpr     : std_logic;
+  signal ID_r_type    : std_logic;
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<IDEX>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   signal IDEX_branch  : std_logic;
   signal IDEX_data_rs : std_logic_vector(DATA_WIDTH - 1 downto 0);
@@ -121,12 +118,27 @@ architecture beh of minimips_top is
 --    signal IDEX_control
   signal IDEX_Simm    : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal IDEX_ta      : std_logic_vector(ADDR_WIDTH - 1 downto 0);
-  signal IDEX_ta_sel  : std_logic;
+  signal IDEX_ta_sel  : std_logic_vector(1 downto 0);
   signal IDEX_lw      : std_logic;
+  signal IDEX_sw      : std_logic;
   signal IDEX_r_type  : std_logic;
   signal IDEX_jump    : std_logic;
   signal IDEX_jumpr   : std_logic;
+  signal IDEX_op      : std_logic_vector(OP_WIDTH - 1 downto 0);
+  signal IDEX_funct   : std_logic_vector(OP_WIDTH - 1 downto 0);
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXECUTE>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
+
+  component minimips_alu is
+    generic (
+      OP_WIDTH   : positive;
+      DATA_WIDTH : positive);
+    port (
+      in_op      : in  std_logic_vector(OP_WIDTH - 1 downto 0);
+      in_funct   : in  std_logic_vector(OP_WIDTH - 1 downto 0);
+      in_a       : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+      in_b       : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+      out_result : out std_logic_vector(DATA_WIDTH - 1 downto 0));
+  end component minimips_alu;
 
   signal EX_branch : std_logic := '0';
   signal EX_stall  : std_logic := '0';
@@ -141,7 +153,7 @@ architecture beh of minimips_top is
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXME>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   signal EXME_alu        : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal EXME_dmem_addr  : std_logic_vector(ADDR_WIDTH - 1 downto 0);
-  signal EXME_dmem_write : std_logic;
+  signal EXME_dmem_write : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal EXME_wb_addr    : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
   signal EXME_lw         : std_logic;
   signal EXME_sw         : std_logic;
@@ -177,18 +189,28 @@ begin
       out_pc      => IF_PC);
 
   out_imem_addr <= IF_PC(ADDR_WIDTH_MEM + 1 downto 2);
+  IF_imem       <= in_imem_read;
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<IFID>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
-  IDEX : process (in_clk, in_rst_n) is
+  IFID : process (in_clk, in_rst_n) is
   begin  -- process MEWB
     if in_rst_n = '0' then              -- asynchronous reset (active low)
       IFID_imem <= (others => '0');
     elsif in_clk'event and in_clk = '1' then  -- rising clock edge
       IFID_imem <= IF_imem;
     end if;
-  end process IDEX;
+  end process IFID;
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<DECODE>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
+
+  ID_opcode  <= IFID_imem(31 downto 26);
+  ID_addr_rs <= IFID_imem(25 downto 21);
+  ID_addr_rt <= IFID_imem(20 downto 16);
+  ID_addr_rd <= IFID_imem(15 downto 11);
+  ID_funct   <= IFID_imem(5 downto 0);
+  ID_target  <= IFID_imem(25 downto 0);
+  ID_imm     <= IFID_imem(15 downto 0);
+
   minimips_rf_1 : minimips_rf
     generic map (
       ADDR_WIDTH => ADDR_WIDTH_RF,
@@ -201,8 +223,8 @@ begin
       in_addr_rb  => ID_addr_rt,
       in_addr_w   => MEWB_wb_addr,
       in_data_w   => WB_data,
-      out_data_ra => ID_data_ra,
-      out_data_rb => ID_data_rb);
+      out_data_ra => ID_data_rs,
+      out_data_rb => ID_data_rt);
 
   --EXT
   ID_ta(JTA_WIDTH - 1 downto 0)                       <= ID_target;
@@ -215,10 +237,11 @@ begin
                                        else (others => '1');
 
   --DECODE
-  DECODE : process(ID_funct, ID_opcode)
+  DECODE : process(ID_funct, ID_opcode, ID_addr_rt, ID_addr_rs, ID_addr_rd)
   begin
     case ID_opcode is
       when rtype_opcode =>
+        ID_r_type <= '1';
         case ID_funct is
           when add_funct | sub_funct | and_funct | or_funct =>
             ID_ta_sel  <= "00";
@@ -227,7 +250,7 @@ begin
             ID_wb_addr <= ID_addr_rd;
             ID_jump    <= '0';
             ID_jumpr   <= '0';
-
+            ID_branch  <= '0';
           when jr_funct =>
             ID_ta_sel  <= "10";
             ID_lw      <= '0';
@@ -235,6 +258,7 @@ begin
             ID_wb_addr <= (others => '0');
             ID_jump    <= '0';
             ID_jumpr   <= '1';
+            ID_branch  <= '0';
           when others =>
             ID_ta_sel  <= "00";
             ID_lw      <= '0';
@@ -242,49 +266,62 @@ begin
             ID_wb_addr <= (others => '0');
             ID_jump    <= '0';
             ID_jumpr   <= '0';
+            ID_branch  <= '0';
         end case;
       when addi_opcode =>
+        ID_r_type  <= '0';
         ID_ta_sel  <= "00";
         ID_lw      <= '0';
         ID_sw      <= '0';
         ID_wb_addr <= ID_addr_rt;
         ID_jump    <= '0';
         ID_jumpr   <= '0';
+        ID_branch  <= '0';
       when lw_opcode =>
+        ID_r_type  <= '0';
         ID_ta_sel  <= "00";
         ID_lw      <= '1';
         ID_sw      <= '0';
         ID_wb_addr <= ID_addr_rt;
         ID_jump    <= '0';
         ID_jumpr   <= '0';
+        ID_branch  <= '0';
       when sw_opcode =>
+        ID_r_type  <= '0';
         ID_ta_sel  <= "00";
         ID_lw      <= '0';
         ID_sw      <= '1';
         ID_wb_addr <= (others => '0');
         ID_jump    <= '0';
         ID_jumpr   <= '0';
+        ID_branch  <= '0';
       when beq_opcode =>
+        ID_r_type  <= '0';
         ID_ta_sel  <= "11";
         ID_lw      <= '0';
         ID_sw      <= '0';
         ID_wb_addr <= (others => '0');
         ID_jump    <= '0';
         ID_jumpr   <= '0';
+        ID_branch  <= '1';
       when jump_opcode =>
+        ID_r_type  <= '0';
         ID_ta_sel  <= "01";
         ID_lw      <= '0';
         ID_sw      <= '0';
         ID_wb_addr <= (others => '0');
         ID_jump    <= '1';
         ID_jumpr   <= '0';
+        ID_branch  <= '0';
       when others =>
+        ID_r_type  <= '0';
         ID_ta_sel  <= "00";
         ID_lw      <= '0';
         ID_sw      <= '0';
         ID_wb_addr <= (others => '0');
         ID_jump    <= '0';
         ID_jumpr   <= '0';
+        ID_branch  <= '0';
     end case;
   end process;
 
@@ -295,7 +332,7 @@ begin
     if in_rst_n = '0' then              -- asynchronous reset (active low)
       IDEX_data_rt <= (others => '0');
       IDEX_data_rs <= (others => '0');
-      IDEX_ta_sel  <= '0';
+      IDEX_ta_sel  <= (others => '0');
       IDEX_wb_addr <= (others => '0');
       IDEX_lw      <= '0';
       IDEX_sw      <= '0';
@@ -304,6 +341,9 @@ begin
       IDEX_branch  <= '0';
       IDEX_jumpr   <= '0';
       IDEX_jump    <= '0';
+      IDEX_op      <= (others => '0');
+      IDEX_funct   <= (others => '0');
+      IDEX_r_type  <= '0';
     elsif in_clk'event and in_clk = '1' then  -- rising clock edge
       IDEX_data_rt <= ID_data_rt;
       IDEX_data_rs <= ID_data_rs;
@@ -316,6 +356,9 @@ begin
       IDEX_branch  <= ID_branch;
       IDEX_jumpr   <= ID_jumpr;
       IDEX_jump    <= ID_jump;
+      IDEX_r_type  <= ID_r_type;
+      IDEX_op      <= ID_opcode;
+      IDEX_funct   <= ID_funct;
     end if;
   end process IDEX;
 
@@ -323,13 +366,14 @@ begin
 
   minimips_alu_1 : minimips_alu
     generic map (
+      OP_WIDTH   => OP_WIDTH,
       DATA_WIDTH => DATA_WIDTH)
     port map (
       in_op      => IDEX_op,
       in_funct   => IDEX_funct,
       in_a       => IDEX_data_rs,
       in_b       => EX_alu_b,
-      out_result => out_result);
+      out_result => EX_alu);
 
   EX_eq0 <= '1' when EX_alu = std_logic_vector(to_unsigned(0, DATA_WIDTH)) else '0';
 
@@ -346,6 +390,8 @@ begin
         EX_ta <= IDEX_data_rs;
       when "11" =>
         EX_ta <= IDEX_Simm;
+      when others =>
+        EX_ta <= (others => '0');
     end case;
   end process;
 
@@ -373,7 +419,7 @@ begin
       EXME_dmem_addr  <= EX_dmem_addr;
       EXME_alu        <= EX_alu;
     end if;
-  end process MEWB;
+  end process EXME;
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEMORY>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   out_dmem_addr  <= EXME_dmem_addr(ADDR_WIDTH_MEM + 1 downto 2);

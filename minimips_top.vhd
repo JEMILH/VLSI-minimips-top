@@ -39,6 +39,19 @@ architecture beh of minimips_top is
   signal IF_PC   : std_logic_vector(ADDR_WIDTH - 1 downto 0);
   signal IF_imem : std_logic_vector(ADDR_WIDTH - 1 downto 0);
 
+  component minimips_fwd is
+    generic (
+      ADDR_WIDTH : positive;
+      DATA_WIDTH : positive);
+    port (
+      in_en       : in  std_logic;
+      in_addr_def : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
+      in_addr     : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
+      in_data_def : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+      in_data     : in  std_logic_vector;
+      out_data    : out std_logic_vector(DATA_WIDTH - 1 downto 0));
+  end component minimips_fwd;
+
   component minimips_pc is
     generic (
       ADDR_WIDTH : positive;
@@ -110,10 +123,13 @@ architecture beh of minimips_top is
   signal ID_jump      : std_logic;
   signal ID_jumpr     : std_logic;
   signal ID_r_type    : std_logic;
+  signal ID_wb_en     : std_logic;
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<IDEX>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   signal IDEX_branch  : std_logic;
   signal IDEX_data_rs : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal IDEX_data_rt : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal IDEX_rs_addr : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
+  signal IDEX_rt_addr : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
   signal IDEX_wb_addr : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
 --    signal IDEX_control
   signal IDEX_Simm    : std_logic_vector(DATA_WIDTH - 1 downto 0);
@@ -126,6 +142,7 @@ architecture beh of minimips_top is
   signal IDEX_jumpr   : std_logic;
   signal IDEX_op      : std_logic_vector(OP_WIDTH - 1 downto 0);
   signal IDEX_funct   : std_logic_vector(OP_WIDTH - 1 downto 0);
+  signal IDEX_wb_en   : std_logic;
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXECUTE>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
 
   component minimips_alu is
@@ -143,12 +160,16 @@ architecture beh of minimips_top is
   signal EX_branch : std_logic := '0';
   signal EX_stall  : std_logic := '0';
 
-  signal EX_eq0        : std_logic;
-  signal EX_ta         : std_logic_vector(ADDR_WIDTH - 1 downto 0);
-  signal EX_alu        : std_logic_vector(DATA_WIDTH - 1 downto 0);
-  signal EX_alu_b      : std_logic_vector(DATA_WIDTH - 1 downto 0);
-  signal EX_dmem_addr  : std_logic_vector(ADDR_WIDTH - 1 downto 0);
-  signal EX_dmem_write : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal EX_eq0          : std_logic;
+  signal EX_ta           : std_logic_vector(ADDR_WIDTH - 1 downto 0);
+  signal EX_alu          : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal EX_alu_b        : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal EX_dmem_addr    : std_logic_vector(ADDR_WIDTH - 1 downto 0);
+  signal EX_dmem_write   : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal EX_rs_data_fwd1 : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal EX_rt_data_fwd1 : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal EX_rs_data_fwd2 : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal EX_rt_data_fwd2 : std_logic_vector(DATA_WIDTH - 1 downto 0);
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXME>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   signal EXME_alu        : std_logic_vector(DATA_WIDTH - 1 downto 0);
@@ -157,7 +178,10 @@ architecture beh of minimips_top is
   signal EXME_wb_addr    : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
   signal EXME_lw         : std_logic;
   signal EXME_sw         : std_logic;
+  signal EXME_wb_en      : std_logic;
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEMORY>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
+
+  signal ME_fwd : std_logic;
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEWB>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
 
@@ -165,6 +189,7 @@ architecture beh of minimips_top is
   signal MEWB_dmem    : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal MEWB_wb_addr : std_logic_vector(ADDR_WIDTH_RF - 1 downto 0);
   signal MEWB_lw      : std_logic;
+  signal MEWB_wb_en   : std_logic;
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WRITEBACK>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
 
@@ -218,7 +243,7 @@ begin
     port map (
       in_clk      => in_clk,
       in_rst_n    => in_rst_n,
-      in_we       => '1',
+      in_we       => MEWB_wb_en,
       in_addr_ra  => ID_addr_rs,
       in_addr_rb  => ID_addr_rt,
       in_addr_w   => MEWB_wb_addr,
@@ -227,7 +252,7 @@ begin
       out_data_rb => ID_data_rt);
 
   --EXT
-  ID_ta(JTA_WIDTH - 1 downto 0)                       <= ID_target;
+  ID_ta(JTA_WIDTH - 1 downto 0)          <= ID_target;
   ID_ta(ADDR_WIDTH - 1 downto JTA_WIDTH) <= (others => '0');
 
   -- SIGNED-EXT
@@ -251,6 +276,7 @@ begin
             ID_jump    <= '0';
             ID_jumpr   <= '0';
             ID_branch  <= '0';
+            ID_wb_en   <= '1';
           when jr_funct =>
             ID_ta_sel  <= "10";
             ID_lw      <= '0';
@@ -259,6 +285,7 @@ begin
             ID_jump    <= '0';
             ID_jumpr   <= '1';
             ID_branch  <= '0';
+            ID_wb_en   <= '0';
           when others =>
             ID_ta_sel  <= "00";
             ID_lw      <= '0';
@@ -267,6 +294,7 @@ begin
             ID_jump    <= '0';
             ID_jumpr   <= '0';
             ID_branch  <= '0';
+            ID_wb_en   <= '0';
         end case;
       when addi_opcode =>
         ID_r_type  <= '0';
@@ -277,6 +305,7 @@ begin
         ID_jump    <= '0';
         ID_jumpr   <= '0';
         ID_branch  <= '0';
+        ID_wb_en   <= '1';
       when lw_opcode =>
         ID_r_type  <= '0';
         ID_ta_sel  <= "00";
@@ -286,6 +315,7 @@ begin
         ID_jump    <= '0';
         ID_jumpr   <= '0';
         ID_branch  <= '0';
+        ID_wb_en   <= '1';
       when sw_opcode =>
         ID_r_type  <= '0';
         ID_ta_sel  <= "00";
@@ -295,6 +325,7 @@ begin
         ID_jump    <= '0';
         ID_jumpr   <= '0';
         ID_branch  <= '0';
+        ID_wb_en   <= '0';
       when beq_opcode =>
         ID_r_type  <= '0';
         ID_ta_sel  <= "11";
@@ -304,6 +335,7 @@ begin
         ID_jump    <= '0';
         ID_jumpr   <= '0';
         ID_branch  <= '1';
+        ID_wb_en   <= '0';
       when jump_opcode =>
         ID_r_type  <= '0';
         ID_ta_sel  <= "01";
@@ -313,6 +345,7 @@ begin
         ID_jump    <= '1';
         ID_jumpr   <= '0';
         ID_branch  <= '0';
+        ID_wb_en   <= '0';
       when others =>
         ID_r_type  <= '0';
         ID_ta_sel  <= "00";
@@ -322,6 +355,7 @@ begin
         ID_jump    <= '0';
         ID_jumpr   <= '0';
         ID_branch  <= '0';
+        ID_wb_en   <= '0';
     end case;
   end process;
 
@@ -330,6 +364,8 @@ begin
   IDEX : process (in_clk, in_rst_n) is
   begin  -- process MEWB
     if in_rst_n = '0' then              -- asynchronous reset (active low)
+      IDEX_rs_addr <= (others => '0');
+      IDEX_rt_addr <= (others => '0');
       IDEX_data_rt <= (others => '0');
       IDEX_data_rs <= (others => '0');
       IDEX_ta_sel  <= (others => '0');
@@ -344,7 +380,10 @@ begin
       IDEX_op      <= (others => '0');
       IDEX_funct   <= (others => '0');
       IDEX_r_type  <= '0';
+      IDEX_wb_en   <= '0';
     elsif in_clk'event and in_clk = '1' then  -- rising clock edge
+      IDEX_rs_addr <= ID_addr_rs;
+      IDEX_rt_addr <= ID_addr_rt;
       IDEX_data_rt <= ID_data_rt;
       IDEX_data_rs <= ID_data_rs;
       IDEX_ta_sel  <= ID_ta_sel;
@@ -359,10 +398,61 @@ begin
       IDEX_r_type  <= ID_r_type;
       IDEX_op      <= ID_opcode;
       IDEX_funct   <= ID_funct;
+      IDEX_wb_en   <= ID_wb_en;
     end if;
   end process IDEX;
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EXECUTE>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
+
+
+  minimips_fwd_wbex_rs : minimips_fwd
+    generic map (
+      ADDR_WIDTH => ADDR_WIDTH_RF,
+      DATA_WIDTH => DATA_WIDTH)
+    port map (
+      in_en       => MEWB_wb_en,
+      in_addr_def => IDEX_rs_addr,
+      in_addr     => MEWB_wb_addr,
+      in_data_def => IDEX_data_rs,
+      in_data     => WB_data,
+      out_data    => EX_rs_data_fwd1);
+
+  minimips_fwd_meex_rs : minimips_fwd
+    generic map (
+      ADDR_WIDTH => ADDR_WIDTH_RF,
+      DATA_WIDTH => DATA_WIDTH)
+    port map (
+      in_en       => ME_fwd,
+      in_addr_def => IDEX_rs_addr,
+      in_addr     => EXME_wb_addr,
+      in_data_def => EX_rs_data_fwd1,
+      in_data     => EXME_alu,
+      out_data    => EX_rs_data_fwd2);
+
+  minimips_fwd_wbex_rt : minimips_fwd
+    generic map (
+      ADDR_WIDTH => ADDR_WIDTH_RF,
+      DATA_WIDTH => DATA_WIDTH)
+    port map (
+      in_en       => MEWB_wb_en,
+      in_addr_def => IDEX_rt_addr,
+      in_addr     => MEWB_wb_addr,
+      in_data_def => IDEX_data_rt,
+      in_data     => WB_data,
+      out_data    => EX_rt_data_fwd1);
+
+  minimips_fwd_meex_rt : minimips_fwd
+    generic map (
+      ADDR_WIDTH => ADDR_WIDTH_RF,
+      DATA_WIDTH => DATA_WIDTH)
+    port map (
+      in_en       => ME_fwd,
+      in_addr_def => IDEX_rt_addr,
+      in_addr     => EXME_wb_addr,
+      in_data_def => EX_rt_data_fwd1,
+      in_data     => EXME_alu,
+      out_data    => EX_rt_data_fwd2);
+
 
   minimips_alu_1 : minimips_alu
     generic map (
@@ -371,7 +461,7 @@ begin
     port map (
       in_op      => IDEX_op,
       in_funct   => IDEX_funct,
-      in_a       => IDEX_data_rs,
+      in_a       => EX_rs_data_fwd2,
       in_b       => EX_alu_b,
       out_result => EX_alu);
 
@@ -395,7 +485,7 @@ begin
     end case;
   end process;
 
-  EX_alu_b <= IDEX_data_rt when (IDEX_r_type = '1' or IDEX_branch = '1') else IDEX_Simm;
+  EX_alu_b <= EX_rt_data_fwd2 when (IDEX_r_type = '1' or IDEX_branch = '1') else IDEX_Simm;
 
   EX_dmem_addr  <= EX_alu;
   EX_dmem_write <= IDEX_data_rt;
@@ -410,7 +500,7 @@ begin
       EXME_dmem_write <= (others => '0');
       EXME_dmem_addr  <= (others => '0');
       EXME_alu        <= (others => '0');
-
+      EXME_wb_en      <= '0';
     elsif in_clk'event and in_clk = '1' then  -- rising clock edge
       EXME_sw         <= IDEX_sw;
       EXME_lw         <= IDEX_lw;
@@ -418,6 +508,7 @@ begin
       EXME_dmem_write <= EX_dmem_write;
       EXME_dmem_addr  <= EX_dmem_addr;
       EXME_alu        <= EX_alu;
+      EXME_wb_en      <= IDEX_wb_en;
     end if;
   end process EXME;
 
@@ -426,8 +517,7 @@ begin
   out_dmem_we    <= EXME_sw;
   out_dmem_write <= EXME_dmem_write;
   MEWB_dmem      <= in_dmem_read;
-
-
+  ME_fwd         <= EXME_wb_en and not EXME_lw;
 
 --<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<MEWB>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>--
   MEWB : process (in_clk, in_rst_n) is
@@ -436,9 +526,11 @@ begin
       MEWB_alu     <= (others => '0');
       MEWB_wb_addr <= (others => '0');
       MEWB_lw      <= '0';
+      MEWB_wb_en   <= '0';
     elsif in_clk'event and in_clk = '1' then  -- rising clock edge
       MEWB_alu     <= EXME_alu;
       MEWB_wb_addr <= EXME_wb_addr;
+      MEWB_wb_en   <= EXME_wb_en;
       MEWB_lw      <= EXME_lw;
     end if;
   end process MEWB;
